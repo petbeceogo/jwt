@@ -14,14 +14,15 @@ var (
 
 type (
 	Tokenizer struct {
-		Secret          []byte
-		DefaultPageSize int
+		Secret                []byte
+		PageSize              int
+		EmptyTokenIsFirstMode bool
 	}
 )
 
 func (t *Tokenizer) Generate(payload Payload) (Token, error) {
 	if payload.PageSize == 0 {
-		payload.PageSize = t.DefaultPageSize
+		payload.PageSize = t.PageSize
 	}
 
 	token, err := jwt.SignWithHS256(payload.ToMap(), t.Secret)
@@ -34,7 +35,14 @@ func (t *Tokenizer) Generate(payload Payload) (Token, error) {
 
 func (t *Tokenizer) Parse(token Token) (Payload, error) {
 	if len(token) == 0 {
-		return _Empty, ErrInvalidToken
+		if t.EmptyTokenIsFirstMode {
+			return Payload{
+				LastID:   "",
+				PageSize: t.PageSize,
+			}, nil
+		} else {
+			return _Empty, ErrInvalidToken
+		}
 	}
 
 	json, err := jwt.ParseWithHMAC(token, t.Secret)
@@ -54,4 +62,16 @@ func (t *Tokenizer) Parse(token Token) (Payload, error) {
 		LastID:   lastID,
 		PageSize: pageSize,
 	}, nil
+}
+
+func NewTokenizer(
+	secret []byte,
+	pageSize int,
+	emptyTokenIsFirstMode bool,
+) *Tokenizer {
+	return &Tokenizer{
+		Secret:                secret,
+		PageSize:              pageSize,
+		EmptyTokenIsFirstMode: emptyTokenIsFirstMode,
+	}
 }
